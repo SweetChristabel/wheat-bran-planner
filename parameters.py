@@ -9,6 +9,7 @@ UNFULFILLED_PENALTY = -15
 FULL_PENALTY = -30 #should be nasty
 REMAINING_WEEKEND_STOCK_PENALTY = -2 #for each half load remaining in the tank during the weekend
 LONG_NOTICE_CHANGE_COST = -2 #cancellations and extra dispatches planned beyond imminency
+INVALID_ACTION_PENALTY = -10 #w
 EMERGENCY_CHANGE_COST = -5 #cancellations and emergency fetchings within 3 day imminency or weekend
 
 #endregion
@@ -17,8 +18,9 @@ EMERGENCY_CHANGE_COST = -5 #cancellations and emergency fetchings within 3 day i
 PRODUCTION_RATE = { #half-loads per 8 hours, probability 0-1
     0 : 0.15,
     1 : 0.1,
-    2 : 0.7,
-    3 : 0.05
+    2 : 0.3,
+    3 : 0.4,
+    4 : 0.05
 }
 
 ORDER_RATE = { #incoming orders per workday, probability 0-1
@@ -43,9 +45,6 @@ DISPATCH_RANDOMNESS = {
 }
 
 AGENT_INFLUENCE = 0.9 #agent vs environment weight in weekly planning
-
-TANK_CAPACITY = 15 #Good for a two day weekend; if WORKDAYS is decreased, this should be increased by about 6 per day to prevent unavoidable overfilling.
-WORKDAYS = 5 #Theoretical maximum 7, but weekend-less behaviour is not accounted for.
 
 #endregion
 

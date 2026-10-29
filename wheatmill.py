@@ -5,28 +5,23 @@ from math import ceil
 class TanksFullException(Exception): 
     pass
 
-#TLDR
-    # 5 total tank states
-# 9 possible decisions at the beginning of the week * tank states
-# 5 possible decisions mid-week * tank states * orders * step number
-    # 9 possible orders for this+next iteration
-    # (workdays - 1) * 2 mid-ep decision stages/steps, default 8
-# 5 possible end of week decisions * tank states
-
-#TODO: Consider how to communicate state with agent
-#TODO: Consider how to communicate rewards with agent
-#TODO: Consider how agent communicates action with env
-#TODO: Look at unused functions and variables if any
 
 class WheatMill():
 
-    def __init__(self, seed= p.SEED, workdays=p.WORKDAYS, tank_capacity=p.TANK_CAPACITY):
+    """
+    Initially, tank size and week length were configurable in parameters. That has now been removed.
+    Currently, the only thing not supporting week length configuration is the week planning's order distribution
+    and the agent's response to it, which are both hard coded to a 5 day week.
+
+    """
+
+    def __init__(self, seed= p.SEED): 
         self.current_stock = 0
-        self.tank_capacity = tank_capacity
+        self.tank_capacity = 15
         self.rngesus = random.Random(seed)
-        self.orders = [[0, 0] for _ in range(workdays)] #pre-orders and overflow orders for each workday
-        self.weekend = 7 - workdays
-        self.workdays = workdays
+        self.weekend = 2
+        self.workdays = 5
+        self.orders = [[0, 0] for _ in range(self.workdays)] #pre-orders and overflow orders for each workday
         self.current_time = (0,-1) #(weekday, morning/evening): -1 signals episode start
 
 
@@ -35,7 +30,8 @@ class WheatMill():
     def generate_episode_start(self):
         self.generate_preorders()
         stock = self.calculate_stock_level(foresight = False)
-        return stock, self.orders
+        distribution = self.classify_order_distribution()
+        return stock, distribution
 
     def generate_preorders(self): #a workdays list with random amounts per day
         self.orders = [[self.rngesus.choices(list(p.ORDER_RATE.keys()), weights = p.ORDER_RATE.values())[0], 0] for _ in range(self.workdays)]
@@ -45,13 +41,41 @@ class WheatMill():
                 daily_volume += self.rngesus.choices(list(p.ORDER_SIZE.keys()), weights = p.ORDER_SIZE.values())[0]
             n[0] = daily_volume
 
-                
+     
+    def classify_order_distribution(self):
+        # Extract customer pre-orders, ignoring planned response orders
+        daily_orders = [day[0] for day in self.orders]
+        total_orders = sum(daily_orders)
+
+        # No demand means there is no meaningful distribution pattern
+        if total_orders == 0:
+            return 2  # balanced
+
+        # Normalise so the pattern is independent of total demand
+        distribution = [volume / total_orders for volume in daily_orders]
+
+        # Ideal patterns: early, convex, balanced, concave, late
+        patterns = [
+            [0.40, 0.30, 0.15, 0.10, 0.05],  # 0: early
+            [0.10, 0.20, 0.40, 0.20, 0.10],  # 1: convex
+            [0.20, 0.20, 0.20, 0.20, 0.20],  # 2: balanced
+            [0.30, 0.15, 0.05, 0.15, 0.35],  # 3: concave
+            [0.05, 0.10, 0.15, 0.30, 0.40],  # 4: late
+        ]
+
+        # Find the ideal pattern with the smallest squared distance
+        distances = [
+            sum((actual - ideal) ** 2 for actual, ideal in zip(distribution, pattern))
+            for pattern in patterns
+        ]
+
+        return distances.index(min(distances))           
    
     def dispatch(self): 
         today = self.current_time[0] #today's index, used a lot in this function
         expected_out = sum(self.orders[today])
         reality_lottery = self.rngesus.choices(list(p.DISPATCH_RANDOMNESS.keys()), weights = p.DISPATCH_RANDOMNESS.values())[0]
-
+        reward = 0
 
         if reality_lottery == "early pickup":
             if today < self.workdays - 1: #can't do early pickups if there's no week left
@@ -60,9 +84,14 @@ class WheatMill():
                 if self.orders[day][slot] >= 2 and self.current_stock >=2: #only delivers if there actually is stock and an order to deliver
                     self.orders[day][slot] -= 2 
                     self.current_stock -= 2
+                    if slot == 0:
+                        reward += p.PRE_ORDER_REWARD
+                    elif slot == 1:
+                        reward += p.RESPONSE_ORDER_REWARD
         elif reality_lottery == "surprise pickup":
             if self.current_stock >= 2:
                 self.current_stock -= 2
+                reward += p.RESPONSE_ORDER_REWARD #small reward for being able to meet
 
 
         if self.rngesus.choice([0,1]) and self.current_stock >= 2: #50% chance to see if there's an outstanding order that can be picked up late
@@ -72,6 +101,7 @@ class WheatMill():
                         volume_out = min(2, day[i])
                         day[i] -= volume_out
                         self.current_stock -= volume_out
+                        reward += p.RESPONSE_ORDER_REWARD
                         break
                 else:
                     continue
@@ -79,7 +109,9 @@ class WheatMill():
 
 
         # Determine how much of today's volume actually leaves in this round
-        if self.current_time[1] == 0:  # Morning - some orders
+        if today == self.workdays - 1: #friday
+            actual_out = expected_out
+        elif self.current_time[1] == 0:  # Morning - some orders
             actual_out = round(self.rngesus.triangular(0, expected_out))
         else:  # Evening - whatever remains
             actual_out = expected_out
@@ -113,9 +145,9 @@ class WheatMill():
     def get_imminent_orders(self) -> int: #gets today's and tomorrow's orders in full loads
         today = self.current_time[0]
         if today == self.workdays-1: #friday!
-            orders = self.orders[today]
+            orders = sum(self.orders[today])
         else:    
-            orders = self.orders[today] + self.orders[today+1]
+            orders = sum(self.orders[today] + self.orders[today+1])
         orders = ceil(orders/2) #half load orders do count
         return orders
 
@@ -124,7 +156,7 @@ class WheatMill():
 
     def plan_week(self, strategy: tuple) -> tuple: #initial, weekly planned response orders
         outlook, timing = strategy
-        weekend_prod_estimate = 3 * self.weekend * 1.75 #a realistic model considering the probability tables
+        weekend_prod_estimate = 3 * self.weekend * 2 #a realistic model considering the probability tables
         monday_stock_estimate = min(
             self.tank_capacity,
             self.current_stock + weekend_prod_estimate
@@ -217,30 +249,95 @@ class WheatMill():
         if action == 0:
             pass #do nothing
         elif action == 1:
-            self.plan_ahead()
-            reward += p.LONG_NOTICE_CHANGE_COST
+            success = self.plan_ahead()
+            if success:
+                reward += p.LONG_NOTICE_CHANGE_COST
+            else:
+                reward += p.INVALID_ACTION_PENALTY
         elif action == 2:
-            self.cancel_order_later()
-            reward += p.LONG_NOTICE_CHANGE_COST
+            success = self.cancel_order_later()
+            if success:
+                reward += p.LONG_NOTICE_CHANGE_COST
+            else:
+                reward += p.INVALID_ACTION_PENALTY
         elif action == 3:
-            self.emergency_dispatch()
-            reward += p.EMERGENCY_CHANGE_COST
+            success = self.emergency_dispatch()
+            if success:
+                reward += p.EMERGENCY_CHANGE_COST
+            else:
+                reward += p.INVALID_ACTION_PENALTY
         elif action == 4:
-            self.cancel_order_now()
-            reward += p.EMERGENCY_CHANGE_COST
+            success = self.cancel_order_now()
+            if success:
+                reward += p.EMERGENCY_CHANGE_COST
+            else:
+                reward += p.INVALID_ACTION_PENALTY
         return reward
 
     def emergency_dispatch(self): #reliable but costly. also used for weekend.
-        self.current_stock -= 2
+        if self.current_stock < 2:
+            self.current_stock = 0
+            return False
+        else:
+            self.current_stock -= 2
+            return True
 
-    def plan_ahead(self,): #add overflow orders to a future day, which one? Should it have a penalty late in the week?
-        pass #TODO
+    def plan_ahead(self,): #add an overflow order to day after tomorrow. Penalize if it's late in the week.
+        current_day = self.current_time[0]
+
+        # Eligible days are strictly later than tomorrow
+        eligible_days = range(current_day + 2, self.workdays)
+
+        # Choose the earliest eligible day
+        target_day = next(iter(eligible_days), None)
+
+        if target_day is None:
+            return False  # No eligible day; caller applies failure penalty
+
+        self.orders[target_day][1] += 2  # Add two half-loads (one full load)
+        return True
 
     def cancel_order_later(self): #cancels an order that's not today or tomorrow. prioritises overflow orders.
-        pass #TODO
+        current_day = self.current_time[0]
+        eligible_days = range(current_day + 2, self.workdays)
 
-    def cancel_order_now(self): #cancels one of today's or if none left, tomorrow's orders. prioritises overflow orderss.
-        pass #TODO
+        # Prefer the earliest available overflow order
+        for day in eligible_days:
+            if self.orders[day][1] > 0:
+                self.orders[day][1] -= min(2, self.orders[day][1])
+                return True
+
+        # Otherwise, cancel the earliest available customer order
+        for day in eligible_days:
+            if self.orders[day][0] >= 2:
+                self.orders[day][0] -= 2
+                return True
+
+        return False
+
+    def cancel_order_now(self): #cancels an imminent order
+        current_day = self.current_time[0]
+        tomorrow = current_day + 1
+
+        # Priority: today's overflow, today's customers,
+        # tomorrow's overflow, tomorrow's customers
+        priorities = [
+            (current_day, 1),
+            (current_day, 0),
+            (tomorrow, 1),
+            (tomorrow, 0)
+        ]
+
+        for day, order_type in priorities:
+            if day >= self.workdays:
+                continue
+
+            if self.orders[day][order_type] > 0:
+                cancelled = min(2, self.orders[day][order_type])
+                self.orders[day][order_type] -= cancelled
+                return True
+
+        return False
 
     #endregion
 
@@ -259,7 +356,7 @@ class WheatMill():
             self.produce()
 
 
-    def weekend_produce(self): #consider also adding 1 or 2, since friday evening and night are technically also included.
+    def weekend_produce(self):
         for _ in range(3 * self.weekend):
             self.produce()
 
@@ -297,22 +394,8 @@ class WheatMill():
             time[1] +=1
         self.current_time = tuple(time)
 
-    def get_next_time(self, time):
-        time = list(time)
-
-        if time == [self.workdays - 1, 1]:
-            time[0] = 0
-            time[1] = -1
-        elif time[1] == 1:
-            time[1] = 0
-            time[0] += 1
-        else:
-            time[1] += 1
-
-        return tuple(time)
-
     def calculate_time_left(self): #calculates the amount of remaining decisions
-        return self.workdays * 2 - (self.current_time[0] * 2 + self.current_time[1])
+        return self.workdays * 2 - (self.current_time[0] * 2 + self.current_time[1]) - 1 
 
     #endregion
 
@@ -339,8 +422,11 @@ class WheatMill():
 
             elif self.current_time == (self.workdays - 1, 1): #gives final reward, ends the episode
                 for _ in range(action): #emergency pre-weekend emptying
-                    self.emergency_dispatch()
-                    reward += p.EMERGENCY_CHANGE_COST
+                    success = self.emergency_dispatch()
+                    if success:
+                        reward += p.EMERGENCY_CHANGE_COST
+                    else:
+                        reward += p.INVALID_ACTION_PENALTY
                 reward += p.REMAINING_WEEKEND_STOCK_PENALTY * self.current_stock
                 self.increment_time()
                 time_left = 0 #calculate_time_left would return a negative value here
