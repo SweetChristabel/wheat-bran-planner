@@ -2,6 +2,24 @@ import random
 import numpy as np
 import parameters as p
 from wheatmill import WheatMill
+from typing import NamedTuple
+
+class EpisodeOutcome(NamedTuple):
+    start_state: tuple #generated state
+    plan_week_action: tuple 
+    plan_week_state: tuple #state after planning the week
+    startq_reward: int #all accumulated rewards for the week planner
+    running_states: list #all the running states prior to action
+    running_actions: list #all actions taken by running_q during the ep
+    running_reward: int #accumulated running rewards
+    endofweek_state: tuple #pre-weekend decision state
+    endofweek_action: int #final_q action
+    final_state: tuple
+    weekend_prod_reward: int #Final reward for PREVIOUS WEEK's decision
+    exploration_count: int #amount of explore actions taken
+
+
+
 
 
 
@@ -44,17 +62,20 @@ class QLearningAgent:
         timing = action % 5
         return outlook, timing
 
-    def episode(self, env, learn = True, show = False): #TODO IMPLEMENT SHOW
+    def episode(self, env, learn = True):
         start_state = env.generate_episode_start()
         startq_reward_tracker = 0
+        exploration_tracker = 0
         start_choice, explored = self.choose(start_state, self.start_q, flag = True, learn = learn)
         start_action = self.decode_week_planning_action(start_choice)
+        if explored:
+            exploration_tracker +=1
         
         plan_week_state = env.plan_week(start_action)
-        stock, orders, time_left, weekend_reward = env.step(0) #first iteration - no decision is made here
+        stock, orders, time_left, weekend_prod_reward = env.step(0) #first iteration - no decision is made here
         state = stock, orders, time_left
 
-        self.weekend_reward += weekend_reward
+        self.weekend_reward += weekend_prod_reward
 
         if learn:
             #FINAL Q LEARNING, Monte Carlo style
@@ -66,11 +87,16 @@ class QLearningAgent:
                 self.final_q[self.weekend_state][self.weekend_action] = new
 
 
+        running_actions = []
+        running_states = []
 
         #MID WEEK LOOP
         while state[-1] > 0: #time_left
+            running_states.append(state)
             action, explored = self.choose(state, self.running_q, learn = learn)
-
+            running_actions.append(action)
+            if explored:
+                exploration_tracker +=1
             stock, orders, time_left, reward = env.step(action)
             new_state = stock, orders, time_left
             startq_reward_tracker += reward
@@ -95,7 +121,11 @@ class QLearningAgent:
         self.weekend_state = state[0]
         #Weekend choice - whether to order emergency emptying and if so, how many. Max 4.
         self.weekend_action, explored = self.choose(self.weekend_state, self.final_q, learn = learn)
-        reward = env.step(self.weekend_action)[-1]
+        if explored:
+            exploration_tracker +=1
+        stock, orders, time, reward = env.step(self.weekend_action)
+        final_state = stock, orders, time
+        running_reward = startq_reward_tracker
         startq_reward_tracker += reward #Both start and final q learn from this
         self.weekend_reward = reward
         if learn:
@@ -105,16 +135,23 @@ class QLearningAgent:
                 startq_reward_tracker - old
             )
             self.start_q[start_state][start_action] = new
+        outcome = EpisodeOutcome(start_state, start_action, plan_week_state, startq_reward_tracker, running_states, running_actions, running_reward, self.weekend_state, self.weekend_action, final_state, weekend_prod_reward, exploration_tracker)
+        return outcome
 
 
     def train(self, episodes):
         training_environment = WheatMill()
         for _ in range(episodes):
-            self.episode(training_environment)
+            outcome = self.episode(training_environment)
+            self.history.append(outcome)
 
 
     def greedy_path(self, demo_length = 5):
+        demo_history =[]
         demo_environment = WheatMill()
         for _ in range(demo_length):
-            self.episode(demo_environment, learn = False, show = True)
-        #skeleton episode
+            outcome = self.episode(demo_environment, learn = False)
+            demo_history.append(outcome)
+        return demo_history
+
+        
