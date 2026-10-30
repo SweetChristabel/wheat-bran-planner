@@ -347,7 +347,7 @@ class WheatMill():
             situation = self.current_stock - todays_orders
         else:
             situation = self.current_stock
-        if situation < 0:
+        if situation <= 0:
             return 0 #empty
         elif situation <= 3:
             return 1 #low

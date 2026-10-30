@@ -166,7 +166,7 @@ def plot_comparison(results, iter):
     plt.ylabel("Mean weekly reward")
     plt.title("Agent performance comparison")
     plt.tight_layout()
-    plt.savefig(f"results/agent_comparison{iter}.png")
+    plt.savefig(f"results/agent_comparison{iter+1}.png")
 
 
 def outcome_interpreter(outcome: EpisodeOutcome):

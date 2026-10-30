@@ -6,6 +6,8 @@ import os
 import platform
 import subprocess
 import numpy as np
+import parameters as p
+import random
 
 def notify(): #ONLY TESTED ON MAC
     system = platform.system()
@@ -76,29 +78,28 @@ def train(agent, length, show_q = False):
 
 
 def main():
+    rng = random.Random(p.ENVIRONMENT_SEED)
     os.makedirs("results", exist_ok=True)
-    print("How many training episodes should we run?")
-    print("For quick but usable results, one million.")
-    print("10 million and you can probably go eat dinner.")
-    TRAIN_LENGTH = int(input("Insert number: "))
-    SHOW_Q_TABLES = bool(input("Before we start - type 1 if you want to see the q-tables, 0 if you do not. : "))
+    print(f"Starting training with {p.TRAINING_EPISODES} episodes. Please wait.")
     q_agent = QLearningAgent()
-    train(q_agent, TRAIN_LENGTH, SHOW_Q_TABLES)
+    train(q_agent, p.TRAINING_EPISODES, p.SHOW_Q_TABLES)
     epsilon_plotter(q_agent.epsilon_plot)
     notify()
     print("Ding dong, training is done")
     input("Press Enter to proceed with evaluations.")
 
-    evaluations = 5
-    seeds = [1337, 42, 58808, 6767, 9001]
+    seeds = rng.sample(range(2**32), k=p.EVALUATION_RUNS)
     random_agent = RandomAgent()
     rule_agent = RuleBasedAgent()
     # Generate evaluation outcomes
-    for i in range(evaluations):
-        env = WheatMill(seeds[i])
-        q_outcomes = q_agent.greedy_path(env, episodes=100)
-        random_outcomes = random_agent.run(env, episodes=100)
-        rule_outcomes = rule_agent.run(env, episodes=100)
+    for i in range(p.EVALUATION_RUNS):
+        q_env = WheatMill(seeds[i])
+        ran_env = WheatMill(seeds[i])
+        rule_env = WheatMill(seeds[i])
+
+        q_outcomes = q_agent.greedy_path(q_env, p.EVALUATION_EPISODES)
+        random_outcomes = random_agent.run(ran_env, p.EVALUATION_EPISODES)
+        rule_outcomes = rule_agent.run(rule_env, p.EVALUATION_EPISODES)
 
 
         results = {

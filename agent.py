@@ -29,7 +29,6 @@ class EpisodeOutcome(NamedTuple):
 class RandomAgent:
     def __init__(self):
         self.rngesus = random.Random(p.DEFAULT_AGENT_SEED)
-        self.history = []
 
 
     def choose(self, flag = False):
@@ -92,16 +91,10 @@ class RandomAgent:
         return outcome
 
     def run(self, env, episodes):
-        for _ in range(episodes):
-            outcome = self.episode(env)
-            self.history.append(outcome)
-        return self.history
+        return [self.episode(env) for _ in range(episodes)]
 
 
 class RuleBasedAgent:
-    def __init__(self):
-            self.history = []
-
 
     def choose_week(self, state):
         stock, dist = state
@@ -206,12 +199,8 @@ class RuleBasedAgent:
             )
         return outcome
 
-
     def run(self, env, episodes):
-        for _ in range(episodes):
-            outcome = self.episode(env)
-            self.history.append(outcome)
-        return self.history
+        return [self.episode(env) for _ in range(episodes)]
 
 class QLearningAgent:
     def __init__(self):
@@ -356,10 +345,15 @@ class QLearningAgent:
 
         return self.history
 
+    def reset_episode_memory(self):
+        self.weekend_state = None
+        self.weekend_action = None
+        self.weekend_reward = 0
 
     def greedy_path(self, env, episodes):
         demo_history =[]
         for _ in range(episodes):
+            self.reset_episode_memory()
             outcome = self.episode(env, learn = False)
             demo_history.append(outcome)
         return demo_history
