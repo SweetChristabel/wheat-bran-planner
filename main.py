@@ -1,11 +1,11 @@
 from agent import QLearningAgent, RuleBasedAgent, RandomAgent
 from wheatmill import WheatMill
 import time
-from interpreters import outcome_interpreter, q_table_interpreter, epsilon_plotter, plot_comparison
-from evaluator import evaluate, compare
+from interpreters import outcome_interpreter, q_table_interpreter, epsilon_plotter, plot_comparison, compare
 import os
 import platform
 import subprocess
+import numpy as np
 
 def notify(): #ONLY TESTED ON MAC
     system = platform.system()
@@ -26,7 +26,32 @@ def notify(): #ONLY TESTED ON MAC
     else:
         print("Notification sound unavailable on this OS.")
 
+def evaluate(outcomes):
+    episodes = len(outcomes)
 
+    return {
+        "mean_reward": np.mean([
+            o.startq_reward + o.weekend_prod_reward
+            for o in outcomes
+        ]),
+
+        "std_reward": np.std([
+            o.startq_reward + o.weekend_prod_reward for o in outcomes
+        ]),
+
+        "emergency_dispatches_per_week":
+            sum(o.emergency_dispatches for o in outcomes) / episodes,
+
+        "cancellations_per_week":
+            sum(o.cancellations for o in outcomes) / episodes,
+
+        "tank_full_events_per_100_weeks":
+            sum(o.tank_full_events for o in outcomes) / episodes * 100,
+
+        "failed_dispatches_per_week":
+            sum(o.failed_dispatches for o in outcomes) / episodes
+        
+    }
 
 def train(agent, length, show_q = False):
     start_time = time.perf_counter()
@@ -82,7 +107,7 @@ def main():
         "Rule-based": evaluate(rule_outcomes),
         }
         compare(results, i)
-        plot_comparison(results)
+        plot_comparison(results, i)
 
 
 
