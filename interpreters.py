@@ -162,7 +162,7 @@ def plot_comparison(results, iter):
     deviations = [results[name]["std_reward"] for name in names]
 
     plt.figure(figsize=(8, 5))
-    plt.bar(names, means, yerr=deviations, capsize=5)
+    plt.barh(names, means, xerr=deviations, capsize=5)
     plt.ylabel("Mean weekly reward")
     plt.title("Agent performance comparison")
     plt.tight_layout()
@@ -341,3 +341,4 @@ def epsilon_plotter(epsilon_history, interval=1000):
 
     plt.tight_layout()
     plt.savefig("results/epsilonplot.png")
+    plt.close()
