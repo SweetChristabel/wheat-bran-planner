@@ -81,7 +81,7 @@ def main():
     print("For quick but usable results, one million.")
     print("10 million and you can probably go eat dinner.")
     TRAIN_LENGTH = int(input("Insert number: "))
-    SHOW_Q_TABLES = bool(input("Before we start - type 1 if you want to see the q-tables, 0 if you do not. :"))
+    SHOW_Q_TABLES = bool(input("Before we start - type 1 if you want to see the q-tables, 0 if you do not. : "))
     q_agent = QLearningAgent()
     train(q_agent, TRAIN_LENGTH, SHOW_Q_TABLES)
     epsilon_plotter(q_agent.epsilon_plot)

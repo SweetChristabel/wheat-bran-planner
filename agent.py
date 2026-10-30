@@ -342,11 +342,12 @@ class QLearningAgent:
 
     def train(self, episodes):
         training_environment = WheatMill()
+        epsilon_decay = (p.EPSILON_MIN / p.EPSILON_START) ** (1 / episodes)
         for i in range(episodes):
             outcome = self.episode(training_environment)
             self.epsilon = max(
                 p.EPSILON_MIN,
-                self.epsilon * p.EPSILON_DECAY
+                self.epsilon * epsilon_decay
             )
 
             if i % 1000 == 0:
