@@ -74,39 +74,7 @@ class WheatMill():
     def dispatch(self): 
         today = self.current_time[0] #today's index, used a lot in this function
         expected_out = sum(self.orders[today])
-        reality_lottery = self.rngesus.choices(list(p.DISPATCH_RANDOMNESS.keys()), weights = p.DISPATCH_RANDOMNESS.values())[0]
         reward = 0
-
-        if reality_lottery == "early pickup":
-            if today < self.workdays - 1: #can't do early pickups if there's no week left
-                day = self.rngesus.randint(today + 1, self.workdays - 1)
-                slot = self.rngesus.choice([0,1])
-                if self.orders[day][slot] >= 2 and self.current_stock >=2: #only delivers if there actually is stock and an order to deliver
-                    self.orders[day][slot] -= 2 
-                    self.current_stock -= 2
-                    if slot == 0:
-                        reward += p.PRE_ORDER_REWARD
-                    elif slot == 1:
-                        reward += p.RESPONSE_ORDER_REWARD
-        elif reality_lottery == "surprise pickup":
-            if self.current_stock >= 2:
-                self.current_stock -= 2
-                reward += p.RESPONSE_ORDER_REWARD #small reward for being able to meet
-
-
-        if self.rngesus.choice([0,1]) and self.current_stock >= 2: #50% chance to see if there's an outstanding order that can be picked up late
-            for day in self.orders[:today]:
-                for i in range(2):
-                    if day[i] > 0:
-                        volume_out = min(2, day[i])
-                        day[i] -= volume_out
-                        self.current_stock -= volume_out
-                        reward += p.RESPONSE_ORDER_REWARD
-                        break
-                else:
-                    continue
-                break
-
 
         # Determine how much of today's volume actually leaves in this round
         if today == self.workdays - 1: #friday
@@ -115,9 +83,6 @@ class WheatMill():
             actual_out = round(self.rngesus.triangular(0, expected_out))
         else:  # Evening - whatever remains
             actual_out = expected_out
-
-        if reality_lottery == "no show": #one load remains undelivered
-            actual_out = max(0, actual_out -2)
 
         # Deduct dispatched volume from today's outstanding orders
         remaining = actual_out
@@ -142,13 +107,13 @@ class WheatMill():
 
         return reward
 
-    def get_imminent_orders(self) -> int: #gets today's and tomorrow's orders in full loads
+    def get_imminent_orders(self) -> int: #makes the order space more manageable for the agent
         today = self.current_time[0]
         if today == self.workdays-1: #friday!
             orders = sum(self.orders[today])
         else:    
             orders = sum(self.orders[today] + self.orders[today+1])
-        orders = ceil(orders/2) #half load orders do count
+        orders = min(ceil(orders/4), 5) #half load orders do count
         return orders
 
 
@@ -201,7 +166,7 @@ class WheatMill():
         for day_index in range(self.workdays):
             self.orders[day_index][1] = allocations[day_index]
 
-        tanks = self.calculate_stock_level()
+        tanks = self.calculate_stock_level(foresight=False)
         orders = self.get_imminent_orders()
         time = self.calculate_time_left()
 

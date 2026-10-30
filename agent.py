@@ -28,16 +28,18 @@ class QLearningAgent:
         self.rngesus = random.Random(p.SEED)
         self.history = []
         self.start_q = np.zeros((5, 5, 15)) #tank states * orders * options
-        self.running_q = np.zeros((5, 9, 10, 5)) #tank states * order states * steps * options
+        self.running_q = np.zeros((5, 6, 10, 5)) #tank states * order states * steps * options
         self.final_q = np.zeros((5, 5)) #tank states * options
         self.weekend_state = None #for final_q learning that carries over episode limits
         self.weekend_action = None
         self.weekend_reward = 0
+        self.epsilon = p.EPSILON_START
+        self.epsilon_plot = []
 
 
     def choose(self, state, q, flag = False, learn = True):
         #EXPLORE
-        if self.rngesus.random() < p.EPSILON and learn:
+        if self.rngesus.random() < self.epsilon and learn:
             if flag: #start of week choice
                 return self.rngesus.randrange(15), True
             else:
@@ -130,20 +132,29 @@ class QLearningAgent:
         self.weekend_reward = reward
         if learn:
         #START Q LEARNING, Monte Carlo style
-            old = self.start_q[start_state][start_action]
+            old = self.start_q[start_state][start_choice]
             new = old + p.ALPHA * (
                 startq_reward_tracker - old
             )
-            self.start_q[start_state][start_action] = new
+            self.start_q[start_state][start_choice] = new
         outcome = EpisodeOutcome(start_state, start_action, plan_week_state, startq_reward_tracker, running_states, running_actions, running_reward, self.weekend_state, self.weekend_action, final_state, weekend_prod_reward, exploration_tracker)
         return outcome
 
 
     def train(self, episodes):
         training_environment = WheatMill()
-        for _ in range(episodes):
+        for i in range(episodes):
             outcome = self.episode(training_environment)
-            self.history.append(outcome)
+            self.epsilon = max(
+                p.EPSILON_MIN,
+                self.epsilon * p.EPSILON_DECAY
+            )
+
+            if i % 1000 == 0:
+                self.history.append(outcome)
+                self.epsilon_plot.append(self.epsilon)
+
+        return self.history
 
 
     def greedy_path(self, demo_length = 5):

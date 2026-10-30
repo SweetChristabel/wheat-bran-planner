@@ -27,21 +27,13 @@ ORDER_RATE = { #incoming orders per workday, probability 0-1
     0 : 0.1,
     1 : 0.25,
     2 : 0.35,
-    3 : 0.23,
-    4 : 0.06,
-    5 : 0.01,
+    3 : 0.24,
+    4 : 0.01,
 }
 
 ORDER_SIZE = { #Usually a full load (two half-loads), but not always
     1 : 0.05,
     2 : 0.95,
-}
-
-DISPATCH_RANDOMNESS = {
-    "surprise pickup": 0.01,
-    "no show": 0.05,
-    "early pickup": 0.04,
-    "nothing unusual": 0.9
 }
 
 AGENT_INFLUENCE = 0.9 #agent vs environment weight in weekly planning
@@ -50,9 +42,17 @@ AGENT_INFLUENCE = 0.9 #agent vs environment weight in weekly planning
 
 #region AGENT PARAMETERS
 
-ALPHA = 0
-EPSILON = 0
-GAMMA = 0
+ALPHA = 0.2 #learning rate
+
+
+
+EPSILON_START = 0.8
+EPSILON_MIN = 0.05
+EPSILON_DECAY = 0.99999723
+
+
+
+GAMMA = 0.5 #importance of future rewards, only used in running_q
 
 
 #endregion
