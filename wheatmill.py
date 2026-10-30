@@ -15,7 +15,7 @@ class WheatMill():
 
     """
 
-    def __init__(self, seed= p.SEED): 
+    def __init__(self, seed= p.ENVIRONMENT_SEED): 
         self.current_stock = 0
         self.tank_capacity = 15
         self.rngesus = random.Random(seed)

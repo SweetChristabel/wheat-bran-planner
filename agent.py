@@ -28,7 +28,7 @@ class EpisodeOutcome(NamedTuple):
 
 class RandomAgent:
     def __init__(self):
-        self.rngesus = random.Random(p.SEED)
+        self.rngesus = random.Random(p.DEFAULT_AGENT_SEED)
         self.history = []
 
 
@@ -215,7 +215,7 @@ class RuleBasedAgent:
 
 class QLearningAgent:
     def __init__(self):
-            self.rngesus = random.Random(p.SEED)
+            self.rngesus = random.Random(p.DEFAULT_AGENT_SEED)
             self.history = []
             self.start_q = np.zeros((5, 5, 15)) #tank states * orders * options
             self.running_q = np.zeros((5, 6, 10, 5)) #tank states * order states * steps * options

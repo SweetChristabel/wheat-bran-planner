@@ -1,5 +1,6 @@
 
-SEED = 1337
+DEFAULT_AGENT_SEED = 42069
+ENVIRONMENT_SEED = 404
 
 #region REWARD TABLE
 
@@ -44,13 +45,8 @@ AGENT_INFLUENCE = 0.9 #agent vs environment weight in weekly planning
 
 ALPHA = 0.2 #learning rate
 
-
-
 EPSILON_START = 0.9
-EPSILON_MIN = 0.1
-EPSILON_DECAY = 0.999999422
-
-
+EPSILON_MIN = 0.05
 
 GAMMA = 0.5 #importance of future rewards, only used in running_q
 
