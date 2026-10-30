@@ -264,6 +264,9 @@ During evaluation, exploration is disabled and the agent follows a greedy policy
 
 ### 4.1 Experimental Setup
 The Q-learning agent is compared against a random agent and a manually designed rule-based agent. It is trained for 50 million episodes, after which exploration is disabled.
+
+    At this point, I also feel it highly necessary to point out that the program audibly lets you know once it's done training. Currently only tested on MacOS.
+    
 Evaluation consists of five runs of 500 episodes per agent, using predefined seeds and separate environment instances with identical initial conditions.
 Performance is assessed using the following metrics:
 
