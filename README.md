@@ -110,8 +110,10 @@ Additionally, there's no entity powerful enough to even try to predict when and 
 </table>
 
     
-## 3. First Q-table - the start of the episode    
-In the beginning, we generate pre-orders from customers. Then, whatever capacity that we're expected to produce but that has not been ordered needs to be sent off somewhere. To do that, we consider the current capacity and the order distribution, and make the first decision - planning the week's offload orders. This constitutes the first Q-table that uses a Monte Carlo approach, gathering rewards throughout the week and learning at the end of the week. The weekly planner's strategy is divided into two parts - how much production it expects throughout the week in three tiers, and how it wants to distribute the offload orders throughout the week in five patterns.
+## 3. Q-learning implementation
+
+### 3.1 First Q-table: the weekly planner
+In the beginning, we generate pre-orders from customers. Then, whatever capacity that we're expected to produce but that has not been ordered needs to be sent off somewhere. To do that, we consider the current capacity and the order distribution, and make the first decision - planning the week's offload orders. This constitutes the first Q-table that uses sample-return updating, gathering rewards throughout the week and learning at the end of the week. The weekly planner's strategy is divided into two parts - how much production it expects throughout the week in three tiers, and how it wants to distribute the offload orders throughout the week in five patterns.
 In reality, this happens at the end of the old week, and I've modelled it accordingly - this happens before the weekend's production, so the model has precious little useful information to work with here. 
 
 | State variable | Possible values | Description |
@@ -119,7 +121,7 @@ In reality, this happens at the end of the old week, and I've modelled it accord
 | Stock level | Empty (0), Low (1), Normal (2), High (3), Full (4) | Current tank stock, categorised into five levels. |
 | Order distribution | Early (0), Convex (1), Balanced (2), Concave (3), Late (4) | Expected distribution of customer pre-orders across the five working days, classified into five predefined patterns. |
 
-## 4. Second Q-table - the running decisions
+### 3.2. Second Q-table - the running decisions
 Now we've come to the second, biggest and most important q-table that actually uses the GAMMA parameter and bootstrapping to consider future decisions. It is now Monday morning, the weekend has produced, and now we have to manage the chaos somehow. Decisions are made twice a day throughout the week, with the last one occurring on friday morning. The spacing of the decisions is also realistic - one as we come to work, and one before we go home. One third of the day's production and about half (randomised) of dispatches happen during the workday. Two thirds of production and the remaining dispatches happen after the second decision of the day. 
 For this decision, we consider the current stock, imminent orders (today's and tomorrow's of all kinds) and time remaining until the end of the week. Based on that, we have the options to do nothing, add or cancel an order at least two days ahead, or add or cancel one of today's or tomorrow's orders. The latter, of course, is somewhat costly - nobody likes a short notice.
 
@@ -129,57 +131,134 @@ For this decision, we consider the current stock, imminent orders (today's and t
 | Imminent orders | 0 (0), 1–4 (1), 5–8 (2), 9–12 (3), 13–16 (4), 17+ (5) | Total volume of orders expected in the immediate future, grouped into six ranges. |
 | Time remaining | 0–9 | Number of remaining decision steps in the working week. |
 
-## 5. Third Q-table - the end-of-week desperation
-As we approach the weekend, we reach a place where it would be smart to not have all that much capacity left in the tanks - after all, we need to make space for the weekend's production. This is where the last decision of the week kicks in - do we order emergency emptying, and if so, how many? We can order as many as 4 truckloads, which I could only dream of in the real world - nobody wants to drive during the weekend. Nonetheless, we'd much rather not order any. To make the everyday q-table aware of that challenge, it bootstraps from the weekend Q-table on its last step. The weekend Q-table is simple as that - it considers the stock level and decides how many emergency loads to dispatch. What makes it exciting, however, is its learning implementation - it's the last decision of the episode, but the most important consequences come with the weekend production early in the next episode. Thus, I've made it use the agent's class variables to remember what it did before the weekend and learn from it once the consequences have rolled in. Therefore, this table too uses the Monte Carlo learning style. 
+### 3.3 Third Q-table - the end-of-week desperation
+As we approach the weekend, we reach a place where it would be smart to not have all that much capacity left in the tanks - after all, we need to make space for the weekend's production. This is where the last decision of the week kicks in - do we order emergency emptying, and if so, how many? We can order as many as 4 truckloads, which I could only dream of in the real world - nobody wants to drive during the weekend. Nonetheless, we'd much rather not order any. To make the everyday q-table aware of that challenge, it bootstraps from the weekend Q-table on its last step. The weekend Q-table is simple as that - it considers the stock level and decides how many emergency loads to dispatch. What makes it exciting, however, is its learning implementation - it's the last decision of the episode, but the most important consequences come with the weekend production early in the next episode. Thus, I've made it use the agent's class variables to remember what it did before the weekend and learn from it once the consequences have rolled in. Therefore, this table too uses the sample-return updating style. 
 
 | State variable | Possible values | Description |
 |---|---|---|
 | Stock level | Empty (0), Low (1), Normal (2), High (3), Full (4) | Current tank stock at the end of the working week, categorised into five levels. |
 
 
+### 3.4 Agent Architecture
 
-### 2.2 Actions
+Three different agents are implemented to provide a comparison between learned, random and manually defined strategies.
 
-| Decision stage | Action | Description |
-|---|---|---|
-| | | |
+**Q-learning agent**
 
-### 2.3 Rewards
+The learning agent maintains three Q-tables, each responsible for a different decision horizon, as described in the previous sections. It gradually improves its decisions through trial and error, using the rewards received from the environment as feedback.
 
-| Event | Reward / Penalty | Justification |
-|---|---:|---|
-| | | |
+**Random agent**
 
-### 2.4 Environment and Uncertainty
+The random agent selects uniformly random actions from the available action space. It has no memory, strategy or learning mechanism. Its purpose is to provide a baseline against which the other agents can be compared.
 
----
+**Rule-based agent**
 
-## 3. Q-Learning Implementation
+The rule-based agent follows a set of manually defined heuristics based on stock levels, order volume and time remaining. For example, it prioritises emergency dispatches when stock is critically high and considers cancelling orders when stock is low and demand is high. Its purpose is to represent a simple but sensible strategy that does not require training.
 
-### 3.1 Agent Architecture
+All three agents interact with the `WheatMill` environment and make decisions at the same three stages of an episode. The main difference is how they select their actions.
 
-### 3.2 Learning Algorithm
+### 3.5 Learning Algorithm
 
-| Parameter | Value | Description |
-|---|---:|---|
-| Learning rate ($\alpha$) | | |
-| Discount factor ($\gamma$) | | |
-| Initial exploration ($\epsilon$) | | |
-| Minimum exploration ($\epsilon_{min}$) | | |
-| Training episodes | | |
+The Q-learning agent uses three different update methods, adapted to the decision horizons of the individual Q-tables. All updates use the same learning rate, $\alpha = 0.2$.
 
----
+**Weekly planner – sample-return update**
+
+The weekly planner makes one decision at the beginning of each episode. Its Q-value is updated towards the accumulated reward received throughout the episode:
+
+$$
+Q(s,a) \leftarrow Q(s,a) +
+\alpha\left(G-Q(s,a)\right)
+$$
+
+where $G$ is the total accumulated reward from the weekly decisions, including the final weekend dispatch.
+
+No discount factor is applied to this return.
+
+**Daily decisions – temporal-difference learning**
+
+The daily decision table uses the standard Q-learning update:
+
+$$
+Q(s,a) \leftarrow Q(s,a) +
+\alpha\left[
+r+\gamma\max_{a'}Q(s',a')-Q(s,a)
+\right]
+$$
+
+where $r$ is the immediate reward, $s'$ is the resulting state and $\gamma = 0.5$ is the discount factor.
+
+During the working week, the agent bootstraps from its own estimated future action values. On the final decision step, it instead bootstraps from the weekend Q-table:
+
+$$
+\max_{a'} Q(s',a')
+=
+\begin{cases}
+\max_{a'} Q_{\text{running}}(s',a'),
+& \text{during the week} \\[6pt]
+\max_{a'} Q_{\text{final}}(s'_{\text{stock}},a'),
+& \text{at the end of the week}
+\end{cases}
+$$
+
+This connects the two decision horizons, allowing daily decisions to account for the consequences of the subsequent weekend decision.
+
+**Weekend decisions – delayed sample-return update**
+
+The weekend table uses a sample-return update, but with a slight complication: the consequences of the weekend dispatch decision are not fully realised until production takes place during the following weekend.
+
+The agent therefore stores the previous weekend state, action and accumulated reward in class variables. At the beginning of the next episode, after weekend production has taken place, the previous decision can finally be updated:
+
+$$
+G_{\text{weekend}} =
+r_{\text{dispatch}} +
+r_{\text{weekend production}}
+$$
+
+$$
+Q(s,a) \leftarrow Q(s,a) +
+\alpha\left(G_{\text{weekend}}-Q(s,a)\right)
+$$
+
+This allows the weekend table to learn from both the immediate consequences of its dispatch decision and the subsequent production.
+
+**Exploration and epsilon decay**
+
+Action selection follows an epsilon-greedy policy. With probability $\epsilon$, the agent chooses a random action. Otherwise, it selects an action with the highest estimated Q-value:
+
+$$
+a =
+\begin{cases}
+\text{random action}, & \text{with probability } \epsilon \\[4pt]
+\displaystyle\arg\max_{a'}Q(s,a'), & \text{otherwise}
+\end{cases}
+$$
+
+To encourage exploration early in training while favouring exploitation later, epsilon is gradually reduced from its initial value to a minimum value, both of which are set in parameters.The decay multiplier is calculated from the total number of training episodes:
+
+$$
+d =
+\left(
+\frac{\epsilon_{\min}}{\epsilon_{\text{start}}}
+\right)^{1/N}
+$$
+
+The value is updated after each episode:
+
+$$
+\epsilon_{k+1} =
+\max\left(
+\epsilon_{\min},
+\epsilon_k \cdot d
+\right)
+$$
+
+where $N$ is the total number of training episodes.
+During evaluation, exploration is disabled and the agent follows a greedy policy, selecting the action with the highest estimated Q-value.
+
 
 ## 4. Evaluation and Results
 
 ### 4.1 Experimental Setup
-
-| Parameter | Value |
-|---|---:|
-| Training episodes | |
-| Evaluation runs | |
-| Episodes per evaluation run | |
-| Evaluation seeds | |
 
 **Compared agents:**
 - Q-learning

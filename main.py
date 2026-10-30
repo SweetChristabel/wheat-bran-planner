@@ -1,3 +1,4 @@
+from contextlib import redirect_stdout
 from agent import QLearningAgent, RuleBasedAgent, RandomAgent
 from wheatmill import WheatMill
 import time
@@ -116,4 +117,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with open("output.txt", "w", encoding="utf-8") as f:
+        with redirect_stdout(f):
+            main()
