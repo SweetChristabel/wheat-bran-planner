@@ -1,5 +1,3 @@
-# wheat-bran-planner
-AI &amp; Machine Learning course project
 # Wheat Mill – Reinforcement Learning
 
 *A Q-learning implementation for wheat bran production and inventory management in a simulated wheat mill.*
@@ -352,4 +350,4 @@ WheatMill/
 
 ---
 
-*Project developed as part of [Course name / Assignment].*
+*Project developed as part of [Introduction to AI & Machine Learning Course / Arctic University of Norway / Autumn 2026].*
