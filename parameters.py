@@ -14,7 +14,7 @@ UNFULFILLED_PENALTY = -15
 FULL_PENALTY = -30 #should be nasty
 REMAINING_WEEKEND_STOCK_PENALTY = -2 #for each half load remaining in the tank during the weekend
 LONG_NOTICE_CHANGE_COST = -2 #cancellations and extra dispatches planned beyond imminency
-INVALID_ACTION_PENALTY = -10 #w
+INVALID_ACTION_PENALTY = -10 
 EMERGENCY_CHANGE_COST = -5 #cancellations and emergency fetchings within 3 day imminency or weekend
 
 #endregion

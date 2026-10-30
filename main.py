@@ -86,9 +86,6 @@ def main():
     train(q_agent, p.TRAINING_EPISODES, p.SHOW_Q_TABLES)
     epsilon_plotter(q_agent.epsilon_plot)
     notify()
-    print("Ding dong, training is done")
-    input("Press Enter to proceed with evaluations.")
-
     seeds = rng.sample(range(2**32), k=p.EVALUATION_RUNS)
     random_agent = RandomAgent()
     rule_agent = RuleBasedAgent()
@@ -120,3 +117,4 @@ if __name__ == "__main__":
     with open("output.txt", "w", encoding="utf-8") as f:
         with redirect_stdout(f):
             main()
+
