@@ -19,7 +19,8 @@
 .ruff_cache/
 .pyre/
 .hypothesis/
-__pycache__
+__pycache__/
+
 # Coverage
 
 .coverage

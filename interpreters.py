@@ -126,7 +126,19 @@ def describe_state(state, descriptions):
 
 
 
+def plot_comparison(results, iter):
+    """Plot mean reward and standard deviation for each agent."""
 
+    names = list(results.keys())
+    means = [results[name]["mean_reward"] for name in names]
+    deviations = [results[name]["std_reward"] for name in names]
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(names, means, yerr=deviations, capsize=5)
+    plt.ylabel("Mean weekly reward")
+    plt.title("Agent performance comparison")
+    plt.tight_layout()
+    plt.savefig(f"results/agent_comparison{iter}.png")
 
 
 def outcome_interpreter(outcome: EpisodeOutcome):
@@ -209,6 +221,10 @@ def outcome_interpreter(outcome: EpisodeOutcome):
     print("-" * 75)
     print(f"Total accumulated reward: {outcome.startq_reward}")
     print(f"Exploration decisions:    {outcome.exploration_count}")
+    print(f"Orders cancelled: {outcome.cancellations}")
+    print(f"Orders failed to deliver: {outcome.failed_dispatches}")
+    print(f"Total emergency dispatches: {outcome.emergency_dispatches}")
+    print(f"Tanks overfilled {outcome.tank_full_events} times")
 
     print("=" * 75 + "\n")
 
@@ -296,4 +312,4 @@ def epsilon_plotter(epsilon_history, interval=1000):
     plt.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig("results/epsilonplot.png")

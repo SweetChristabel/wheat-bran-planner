@@ -23,12 +23,23 @@ class WheatMill():
         self.workdays = 5
         self.orders = [[0, 0] for _ in range(self.workdays)] #pre-orders and overflow orders for each workday
         self.current_time = (0,-1) #(weekday, morning/evening): -1 signals episode start
+        self.emergency_dispatches = 0
+        self.cancellations = 0
+        self.tank_full_events = 0
+        self.failed_dispatches = 0
 
 
     #region ORDER HANDLING
 
+    def reset_episode_counters(self):
+        self.emergency_dispatches = 0
+        self.cancellations = 0
+        self.tank_full_events = 0
+        self.failed_dispatches = 0
+
     def generate_episode_start(self):
         self.generate_preorders()
+        self.reset_episode_counters()
         stock = self.calculate_stock_level(foresight = False)
         distribution = self.classify_order_distribution()
         return stock, distribution
@@ -98,6 +109,7 @@ class WheatMill():
         if actual_out > self.current_stock:
             unfulfilled = actual_out - self.current_stock
             self.current_stock = 0
+            self.failed_dispatches += 1
 
         else:
             self.current_stock -= actual_out
@@ -244,6 +256,7 @@ class WheatMill():
             self.current_stock = 0
             return False
         else:
+            self.emergency_dispatches += 1
             self.current_stock -= 2
             return True
 
@@ -270,12 +283,14 @@ class WheatMill():
         for day in eligible_days:
             if self.orders[day][1] > 0:
                 self.orders[day][1] -= min(2, self.orders[day][1])
+                self.cancellations += 1
                 return True
 
         # Otherwise, cancel the earliest available customer order
         for day in eligible_days:
             if self.orders[day][0] >= 2:
                 self.orders[day][0] -= 2
+                self.cancellations += 1
                 return True
 
         return False
@@ -300,6 +315,7 @@ class WheatMill():
             if self.orders[day][order_type] > 0:
                 cancelled = min(2, self.orders[day][order_type])
                 self.orders[day][order_type] -= cancelled
+                self.cancellations += 1
                 return True
 
         return False
@@ -406,12 +422,14 @@ class WheatMill():
                     #morning decision
 
         except TanksFullException:
+            self.tank_full_events += 1
             self.increment_time()
             time_left = self.calculate_time_left()
             reward = p.FULL_PENALTY #ignore everything else if tanks go full, we REALLY don't want that
 
-        stock_level = self.calculate_stock_level()
+
         orders = self.get_imminent_orders()
+        stock_level = self.calculate_stock_level(foresight = False)
 
         return stock_level, orders, time_left, reward
 

@@ -17,24 +17,214 @@ class EpisodeOutcome(NamedTuple):
     final_state: tuple
     weekend_prod_reward: int #Final reward for PREVIOUS WEEK's decision
     exploration_count: int #amount of explore actions taken
+    emergency_dispatches: int
+    cancellations: int
+    tank_full_events: int
+    failed_dispatches: int
 
 
 
 
 
-
-class QLearningAgent:
+class RandomAgent:
     def __init__(self):
         self.rngesus = random.Random(p.SEED)
         self.history = []
-        self.start_q = np.zeros((5, 5, 15)) #tank states * orders * options
-        self.running_q = np.zeros((5, 6, 10, 5)) #tank states * order states * steps * options
-        self.final_q = np.zeros((5, 5)) #tank states * options
-        self.weekend_state = None #for final_q learning that carries over episode limits
-        self.weekend_action = None
-        self.weekend_reward = 0
-        self.epsilon = p.EPSILON_START
-        self.epsilon_plot = []
+
+
+    def choose(self, flag = False):
+        #EXPLORE
+        if flag: #start of week choice
+            return self.rngesus.randrange(15)
+        else:
+            return self.rngesus.randrange(5)
+
+
+    def decode_week_planning_action(self, action):
+        outlook = action // 5
+        timing = action % 5
+        return outlook, timing
+
+    def episode(self, env):
+        start_state = env.generate_episode_start()
+        startq_reward_tracker = 0
+        start_choice = self.choose(flag = True)
+        start_action = self.decode_week_planning_action(start_choice)
+        
+        plan_week_state = env.plan_week(start_action)
+        stock, orders, time_left, weekend_prod_reward = env.step(0) #first iteration - no decision is made here
+        state = stock, orders, time_left
+
+
+        running_actions = []
+        running_states = []
+
+        #MID WEEK LOOP
+        while state[-1] > 0: #time_left
+            running_states.append(state)
+            action = self.choose()
+            running_actions.append(action)
+            stock, orders, time_left, reward = env.step(action)
+            new_state = stock, orders, time_left
+            startq_reward_tracker += reward
+
+            state = new_state
+
+
+        weekend_state = state[0]
+        #Weekend choice - whether to order emergency emptying and if so, how many. Max 4.
+        weekend_action = self.choose()
+        stock, orders, time, reward = env.step(weekend_action)
+        final_state = stock, orders, time
+        running_reward = startq_reward_tracker
+        startq_reward_tracker += reward
+        weekend_prod_reward += reward
+        outcome = EpisodeOutcome(
+            start_state = start_state, plan_week_action = start_action, plan_week_state = plan_week_state, 
+            startq_reward = startq_reward_tracker, running_states = running_states, running_actions = running_actions, 
+            running_reward = running_reward, endofweek_state = weekend_state, endofweek_action = weekend_action,
+            final_state = final_state, weekend_prod_reward = weekend_prod_reward, exploration_count = None,
+            emergency_dispatches=env.emergency_dispatches,
+            cancellations=env.cancellations,
+            tank_full_events=env.tank_full_events,
+            failed_dispatches=env.failed_dispatches
+            )
+        return outcome
+
+    def run(self, env, episodes):
+        for _ in range(episodes):
+            outcome = self.episode(env)
+            self.history.append(outcome)
+        return self.history
+
+
+class RuleBasedAgent:
+    def __init__(self):
+            self.history = []
+
+
+    def choose_week(self, state):
+        stock, dist = state
+
+        if stock <= 1: #low
+            outlook = 2 #pessimistic
+        elif stock == 2: #normal
+            outlook = 0 #normal
+        else:           #high
+            outlook = 1 #optimistic
+
+        if dist == 0:   #early
+            timing = 2  #late
+        elif dist == 1: #convex
+            timing = 4  #concave
+        elif dist == 2: #balanced
+            timing = 0  #balanced
+        elif dist == 3: #concave
+            timing = 3  #convex
+        else:           #late
+            timing = 1  #early
+
+        return outlook, timing
+
+
+    def choose_daily(self, state):
+        stock, orders, time_left = state
+
+        # Critically high stock
+        if stock == 4:
+            return 3  # Emergency dispatch
+
+        # Excess stock and insufficient demand
+        elif stock >= 3 and orders <= 1:
+            if time_left >= 5:
+                return 1  # Plan ahead
+            else:
+                return 3  # Emergency dispatch
+
+        # Low stock and high demand
+        elif stock <= 1 and orders >= 4:
+            if time_left >= 5:
+                return 2  # Cancel later order
+            else:
+                return 4  # Cancel imminent order
+
+        # No intervention necessary
+        else:
+            return 0
+        
+    def choose_weekend(self, state):
+        if state <= 1:
+            return 0
+        return state #dispatch as many emergency orders as the tank state says
+
+
+    def decode_week_planning_action(self, action):
+        outlook = action // 5
+        timing = action % 5
+        return outlook, timing
+
+    def episode(self, env):
+        start_state = env.generate_episode_start()
+        start_action = self.choose_week(start_state)
+        startq_reward_tracker = 0
+        plan_week_state = env.plan_week(start_action)
+        stock, orders, time_left, weekend_prod_reward = env.step(0) #first iteration - no decision is made here
+        state = stock, orders, time_left
+
+
+        running_actions = []
+        running_states = []
+
+        #MID WEEK LOOP
+        while state[-1] > 0: #time_left
+            running_states.append(state)
+            action = self.choose_daily(state)
+            running_actions.append(action)
+            stock, orders, time_left, reward = env.step(action)
+            new_state = stock, orders, time_left
+            startq_reward_tracker += reward
+            state = new_state
+
+
+        weekend_state = state[0]
+        #Weekend choice - whether to order emergency emptying and if so, how many. Max 4.
+        weekend_action = self.choose_weekend(weekend_state)
+        stock, orders, time, reward = env.step(weekend_action)
+        final_state = stock, orders, time
+        running_reward = startq_reward_tracker
+        startq_reward_tracker += reward
+        weekend_prod_reward += reward
+        outcome = EpisodeOutcome(
+            start_state = start_state, plan_week_action = start_action, plan_week_state = plan_week_state, 
+            startq_reward = startq_reward_tracker, running_states = running_states, running_actions = running_actions, 
+            running_reward = running_reward, endofweek_state = weekend_state, endofweek_action = weekend_action,
+            final_state = final_state, weekend_prod_reward = weekend_prod_reward, exploration_count = None,
+            emergency_dispatches=env.emergency_dispatches,
+            cancellations=env.cancellations,
+            tank_full_events=env.tank_full_events,
+            failed_dispatches=env.failed_dispatches
+            )
+        return outcome
+
+
+    def run(self, env, episodes):
+        for _ in range(episodes):
+            outcome = self.episode(env)
+            self.history.append(outcome)
+        return self.history
+
+class QLearningAgent:
+    def __init__(self):
+            self.rngesus = random.Random(p.SEED)
+            self.history = []
+            self.start_q = np.zeros((5, 5, 15)) #tank states * orders * options
+            self.running_q = np.zeros((5, 6, 10, 5)) #tank states * order states * steps * options
+            self.final_q = np.zeros((5, 5)) #tank states * options
+            self.weekend_state = None #for final_q learning that carries over episode limits
+            self.weekend_action = None
+            self.weekend_reward = 0
+            self.epsilon = p.EPSILON_START
+            self.epsilon_plot = []
 
 
     def choose(self, state, q, flag = False, learn = True):
@@ -137,7 +327,16 @@ class QLearningAgent:
                 startq_reward_tracker - old
             )
             self.start_q[start_state][start_choice] = new
-        outcome = EpisodeOutcome(start_state, start_action, plan_week_state, startq_reward_tracker, running_states, running_actions, running_reward, self.weekend_state, self.weekend_action, final_state, weekend_prod_reward, exploration_tracker)
+        outcome = EpisodeOutcome(
+            start_state = start_state, plan_week_action = start_action, plan_week_state = plan_week_state, 
+            startq_reward = startq_reward_tracker, running_states = running_states, running_actions = running_actions, 
+            running_reward = running_reward, endofweek_state = self.weekend_state, endofweek_action = self.weekend_action,
+            final_state = final_state, weekend_prod_reward = weekend_prod_reward, exploration_count = exploration_tracker,
+            emergency_dispatches=env.emergency_dispatches,
+            cancellations=env.cancellations,
+            tank_full_events=env.tank_full_events,
+            failed_dispatches=env.failed_dispatches
+            )
         return outcome
 
 
@@ -157,12 +356,9 @@ class QLearningAgent:
         return self.history
 
 
-    def greedy_path(self, demo_length = 5):
+    def greedy_path(self, env, episodes):
         demo_history =[]
-        demo_environment = WheatMill()
-        for _ in range(demo_length):
-            outcome = self.episode(demo_environment, learn = False)
+        for _ in range(episodes):
+            outcome = self.episode(env, learn = False)
             demo_history.append(outcome)
         return demo_history
-
-        
