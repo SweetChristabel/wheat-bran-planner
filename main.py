@@ -81,8 +81,8 @@ def main():
         "Random": evaluate(random_outcomes),
         "Rule-based": evaluate(rule_outcomes),
         }
-        compare(results)
-        plot_comparison(results,i)
+        compare(results, i)
+        plot_comparison(results)
 
 
 
