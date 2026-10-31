@@ -201,8 +201,7 @@ $$
 where $r$ is the immediate reward, $s'$ is the resulting state and $\gamma = 0.5$ is the discount factor. During the working week, the agent bootstraps from its own estimated future action values. On the final decision step, it instead bootstraps from the weekend Q-table:
 
 $$
-\max_{a'} Q(s',a')
-=
+\max_{a'} Q(s',a') =
 \left\{
 \begin{array}{ll}
 \max_{a'} Q_{\text{running}}(s',a'),
