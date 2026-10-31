@@ -133,7 +133,7 @@ class WheatMill():
 
     #endregion
 
-    #region ACTIONS
+    #region WEEK PLANNER
 
     def plan_week(self, strategy: tuple) -> tuple: #initial, weekly planned response orders
         outlook, timing = strategy
@@ -224,8 +224,11 @@ class WheatMill():
         ]
         return weights
 
+    #endregion
 
-    def interpret_action(self, action): 
+    #region ACTIONS
+
+    def interpret_action(self, action): #action decoder for running q
         reward = 0
         if action == 0:
             pass #do nothing
@@ -326,7 +329,6 @@ class WheatMill():
 
     #endregion
 
-
     #region PRODUCTION
 
     def produce(self): #single production cycle of 8 hours, sufficient for daytime
@@ -365,7 +367,6 @@ class WheatMill():
     
     #endregion
 
-
     #region TIME
     def increment_time(self):
         time = list(self.current_time)
@@ -383,8 +384,6 @@ class WheatMill():
         return self.workdays * 2 - (self.current_time[0] * 2 + self.current_time[1]) - 1 
 
     #endregion
-
-
 
 
     def step(self, action): 
