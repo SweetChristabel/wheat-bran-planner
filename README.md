@@ -9,6 +9,10 @@
 5. Enjoy and have a nice day!
 
 
+## AI Use Disclaimer
+
+ChatGPT was used as an assistant throughout this project, mainly in order to speed up actions that would have taken a long time to to manually. I prioritised my own resources on parts of the project that are most relevant for the scope of the course this project was written for. Thus, agent.py is entirely hand-written, and so is the vast majority of wheatmill.py. In main.py, the training function and main function itself are hand-written. Interpreters.py that is used for interpreting and displaying training and evaluation results is largely AI-written and only adjusted by hand. 
+
 ---
 
 ## Table of Contents
@@ -199,12 +203,14 @@ where $r$ is the immediate reward, $s'$ is the resulting state and $\gamma = 0.5
 $$
 \max_{a'} Q(s',a')
 =
-\begin{cases}
+\left\{
+\begin{array}{ll}
 \max_{a'} Q_{\text{running}}(s',a'),
 & \text{during the week} \\[6pt]
 \max_{a'} Q_{\text{final}}(s'_{\text{stock}},a'),
 & \text{at the end of the week}
-\end{cases}
+\end{array}
+\right.
 $$
 
 This connects the two decision horizons, allowing daily decisions to account for the consequences of the subsequent weekend decision.
@@ -232,8 +238,8 @@ Action selection follows an epsilon-greedy policy. With probability $\epsilon$, 
 $$
 a =
 \begin{cases}
-\text{random action}, & \text{with probability } \epsilon \\[4pt]
-\displaystyle\arg\max_{a'}Q(s,a'), & \text{otherwise}
+\text{random action}, & \text{with probability } \epsilon \\
+\arg\max_{a'} Q(s,a'), & \text{otherwise}
 \end{cases}
 $$
 
@@ -263,7 +269,7 @@ During evaluation, exploration is disabled and the agent follows a greedy policy
 ## 4. Evaluation and Results
 
 ### 4.1 Experimental Setup
-The Q-learning agent is compared against a random agent and a manually designed rule-based agent. It is trained for 50 million episodes, after which exploration is disabled.
+The Q-learning agent is compared against a random agent and a manually designed rule-based agent. In this version it is trained for 50 million episodes - far more than strictly necessary for representative outcomes - , after which exploration is disabled.
 
     At this point, I also feel it highly necessary to point out that the program audibly lets you know once it's done training. Currently only tested on MacOS.
     
@@ -384,7 +390,9 @@ Despite being a reasonably complex implementation for one's first ever q learnin
 
 The state and action spaces are heavily simplified. Stock levels and imminent orders are grouped into categories, meaning that different real-world situations can appear identical to the agent. It also has a limited selection of predefined actions and cannot freely adjust dispatch quantities or invent new strategies. This keeps the Q-tables manageable, but naturally limits the agent's flexibility.
 
-Splitting the decision-making into three separate Q-tables makes the problem easier to handle, but also means that the agent has no unified representation of the entire week. The tables communicate through rewards and bootstrapping, but cannot account for every possible interaction between decisions.
+The mid-week decider only sees the demand of the next couple of days when choosing its actions, despite having access to actions that affect the orders beyond. This is a considerable limitation as it will consequently never truly know what a long term action actually implies. However, this was a necessary evil to keep an already large Q-table within manageable boundaries; even the imminent orders are already heavily simplified and divided into tiers for the same reason. 
+
+Splitting the decision-making into three separate Q-tables makes the problem easier to handle, but also means that the agent has no unified representation of the entire week. The tables communicate through rewards and bootstrapping, but cannot account for every possible interaction between decisions. 
 
 ### 5.3 Limitations of the Learning Approach
 

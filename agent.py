@@ -247,13 +247,19 @@ class QLearningAgent:
         start_state = env.generate_episode_start()
         startq_reward_tracker = 0
         exploration_tracker = 0
+
+        #START OF WEEK DECISION
+
         start_choice, explored = self.choose(start_state, self.start_q, flag = True, learn = learn)
         start_action = self.decode_week_planning_action(start_choice)
         if explored:
             exploration_tracker +=1
         
         plan_week_state = env.plan_week(start_action)
-        stock, orders, time_left, weekend_prod_reward = env.step(0) #first iteration - no decision is made here
+
+        #WEEKEND PRODUCTION
+
+        stock, orders, time_left, weekend_prod_reward = env.step(0) #first iteration - no decision is made here so input is "do nothing"
         state = stock, orders, time_left
 
         self.weekend_reward += weekend_prod_reward
@@ -300,7 +306,10 @@ class QLearningAgent:
 
 
         self.weekend_state = state[0]
-        #Weekend choice - whether to order emergency emptying and if so, how many. Max 4.
+
+
+        #WEEKEND CHOICE - whether to order emergency emptying and if so, how many. Max 4.
+
         self.weekend_action, explored = self.choose(self.weekend_state, self.final_q, learn = learn)
         if explored:
             exploration_tracker +=1
@@ -309,6 +318,7 @@ class QLearningAgent:
         running_reward = startq_reward_tracker
         startq_reward_tracker += reward #Both start and final q learn from this
         self.weekend_reward = reward
+        
         if learn:
         #START Q LEARNING, Monte Carlo style
             old = self.start_q[start_state][start_choice]
@@ -327,7 +337,6 @@ class QLearningAgent:
             failed_dispatches=env.failed_dispatches
             )
         return outcome
-
 
     def train(self, episodes):
         training_environment = WheatMill()

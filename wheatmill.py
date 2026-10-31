@@ -28,8 +28,7 @@ class WheatMill():
         self.tank_full_events = 0
         self.failed_dispatches = 0
 
-
-    #region ORDER HANDLING
+    #region EPISODE START
 
     def reset_episode_counters(self):
         self.emergency_dispatches = 0
@@ -43,6 +42,10 @@ class WheatMill():
         stock = self.calculate_stock_level(foresight = False)
         distribution = self.classify_order_distribution()
         return stock, distribution
+
+    #endregion
+
+    #region ORDER MANAGEMENT
 
     def generate_preorders(self): #a workdays list with random amounts per day
         self.orders = [[self.rngesus.choices(list(p.ORDER_RATE.keys()), weights = p.ORDER_RATE.values())[0], 0] for _ in range(self.workdays)]
@@ -128,6 +131,7 @@ class WheatMill():
         orders = min(ceil(orders/4), 5) #half load orders do count
         return orders
 
+    #endregion
 
     #region ACTIONS
 
@@ -138,7 +142,7 @@ class WheatMill():
             self.tank_capacity,
             self.current_stock + weekend_prod_estimate
         )
-        # Estimate production over the working week
+        # estimate production over the working week
         weekly_prod_estimate = self.workdays * 6
 
         if outlook == 1: #optimistic
@@ -146,7 +150,7 @@ class WheatMill():
         elif outlook == 2: #pessimistic
             weekly_prod_estimate -= 4
 
-        # Estimate total stock that must be accommodated
+        # estimate total stock that must be accommodated
         customer_orders = sum(day[0] for day in self.orders)
         estimated_surplus = max(
             0,
@@ -155,7 +159,7 @@ class WheatMill():
 
         weights = self.get_planning_weights(timing)
 
-        # Allocate whole half-loads proportionally
+        # allocate half-loads proportionally
         total_weight = sum(weights)
         allocations = [
             int(estimated_surplus * weight / total_weight)
@@ -192,7 +196,7 @@ class WheatMill():
         env_total = sum(env_weights)
         env_weights = [w / env_total for w in env_weights]
 
-        # Agent's preferred timing distribution
+        # interpret agent's preferred timing distribution
         middle = (self.workdays - 1) / 2
         agent_weights = []
 
@@ -213,7 +217,7 @@ class WheatMill():
         agent_total = sum(agent_weights)
         agent_weights = [w / agent_total for w in agent_weights]
 
-        # Combine agent strategy and environmental preference
+        # combine agent strategy and environmental preference for placing more overflow orders on days with less pre-orders
         weights = [
             p.AGENT_INFLUENCE * agent_weights[i] + (1-p.AGENT_INFLUENCE) * env_weights[i]
             for i in range(self.workdays)
@@ -221,7 +225,7 @@ class WheatMill():
         return weights
 
 
-    def interpret_action(self, action):
+    def interpret_action(self, action): 
         reward = 0
         if action == 0:
             pass #do nothing
@@ -263,30 +267,30 @@ class WheatMill():
     def plan_ahead(self,): #add an overflow order to day after tomorrow. Penalize if it's late in the week.
         current_day = self.current_time[0]
 
-        # Eligible days are strictly later than tomorrow
+        # eligible days are strictly later than tomorrow
         eligible_days = range(current_day + 2, self.workdays)
 
-        # Choose the earliest eligible day
+        # choose the earliest eligible day
         target_day = next(iter(eligible_days), None)
 
         if target_day is None:
-            return False  # No eligible day; caller applies failure penalty
+            return False  # no eligible day; caller applies failure penalty
 
-        self.orders[target_day][1] += 2  # Add two half-loads (one full load)
+        self.orders[target_day][1] += 2  # edd two half-loads (one full load)
         return True
 
     def cancel_order_later(self): #cancels an order that's not today or tomorrow. prioritises overflow orders.
         current_day = self.current_time[0]
         eligible_days = range(current_day + 2, self.workdays)
 
-        # Prefer the earliest available overflow order
+        # prefer the earliest available overflow order
         for day in eligible_days:
             if self.orders[day][1] > 0:
                 self.orders[day][1] -= min(2, self.orders[day][1])
                 self.cancellations += 1
                 return True
 
-        # Otherwise, cancel the earliest available customer order
+        # otherwise, cancel the earliest available customer order
         for day in eligible_days:
             if self.orders[day][0] >= 2:
                 self.orders[day][0] -= 2
@@ -299,7 +303,7 @@ class WheatMill():
         current_day = self.current_time[0]
         tomorrow = current_day + 1
 
-        # Priority: today's overflow, today's customers,
+        # priority: today's overflow, today's customers,
         # tomorrow's overflow, tomorrow's customers
         priorities = [
             (current_day, 1),
@@ -341,8 +345,8 @@ class WheatMill():
         for _ in range(3 * self.weekend):
             self.produce()
 
-    def calculate_stock_level(self, foresight = True): #discretion for the agent with foresight
-        if foresight:
+    def calculate_stock_level(self, foresight = True): #discretion for the agent with foresight. Foresight is currently not used anywhere.
+        if foresight: #subtracts today's orders from stock
             todays_orders = sum(self.orders[self.current_time[0]])
             situation = self.current_stock - todays_orders
         else:
@@ -383,15 +387,14 @@ class WheatMill():
 
 
 
-    def step(self, action): #episode starts with last workday evening, ends after last workday morning
+    def step(self, action): 
         reward = 0
         try:
-            if self.current_time == (0,-1): #Start of episode - we already have a long term plan
+            if self.current_time == (0,-1): #start of episode - we already have a long term plan
                 reward += self.interpret_action(action)
                 self.weekend_produce()
                 self.increment_time()
-                time_left = self.calculate_time_left()
-                #first morning decision      
+                time_left = self.calculate_time_left()   
 
             elif self.current_time[1] == 0: #every morning including monday
                 reward += self.interpret_action(action)
@@ -399,7 +402,6 @@ class WheatMill():
                 self.produce()
                 self.increment_time()
                 time_left = self.calculate_time_left()
-                #afternoon decision, whether it be end of ep or not
 
             elif self.current_time == (self.workdays - 1, 1): #gives final reward, ends the episode
                 for _ in range(action): #emergency pre-weekend emptying
@@ -419,7 +421,6 @@ class WheatMill():
                     self.overnight_produce()
                     self.increment_time()
                     time_left = self.calculate_time_left()
-                    #morning decision
 
         except TanksFullException:
             self.tank_full_events += 1
