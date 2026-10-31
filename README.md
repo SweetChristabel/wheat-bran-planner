@@ -201,16 +201,13 @@ $$
 where $r$ is the immediate reward, $s'$ is the resulting state and $\gamma = 0.5$ is the discount factor. During the working week, the agent bootstraps from its own estimated future action values. On the final decision step, it instead bootstraps from the weekend Q-table:
 
 $$
-\max_{a'} Q(s',a')
-\; =
-\left\{
-\begin{array}{ll}
-\max_{a'} Q_{\text{running}}(s',a'),
-& \text{during the week} \\[6pt]
-\max_{a'} Q_{\text{final}}(s'_{\text{stock}},a'),
-& \text{at the end of the week}
-\end{array}
-\right.
+\begin{aligned}
+\max_{a'} Q(s',a') &=
+\begin{cases}
+\max_{a'} Q_{\text{running}}(s',a') & \text{during the week} \\
+\max_{a'} Q_{\text{final}}(s'_{\text{stock}},a') & \text{at the end of the week}
+\end{cases}
+\end{aligned}
 $$
 
 This connects the two decision horizons, allowing daily decisions to account for the consequences of the subsequent weekend decision.
